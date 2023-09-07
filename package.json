@@ -1,0 +1,16 @@
+{
+  "name": "my-extension",
+  "scripts": {
+    "build:tailwind": "tailwindcss build src/tailwind.css -o dist/tailwind.css"
+  },
+  "version": "1.0.0",
+  "main": "background.js",
+  "dependencies": {
+    "tailwindcss": "^3.3.3"
+  },
+  "devDependencies": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

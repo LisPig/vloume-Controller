@@ -1,0 +1,30 @@
+{
+  "name": "VolumeController",
+  "version": "0.0.1",
+  "manifest_version": 3,
+  
+  "description": "",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "icons": {
+    "48":"images/logo.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48":"images/logo.png"
+    }
+  },
+  "background":{
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_script.js"],
+      "css": ["dist/tailwind.css"]
+    }
+  ]
+}
