@@ -6,7 +6,14 @@
   "description": "",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://*/*",
+    "https://*/*"
   ],
   "icons": {
     "48":"images/logo.png"
@@ -24,7 +31,8 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content_script.js"],
-      "css": ["dist/tailwind.css"]
+      "css": ["dist/tailwind.css"],
+      "run_at": "document_end"
     }
   ]
 }

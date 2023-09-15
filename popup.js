@@ -1,55 +1,80 @@
+let url;
+let favicon;
+
+chrome.tabs.query({active: true,currentWindow: true }, function(tabs) {
+  var tabId = tabs[0].id;
+  console.log("tabId:"+tabId)
+  url = tabs[0].url;
+  favicon = tabs[0].favIconUrl;
+  /* console.log("Current tab URL: " + url); 
+  console.log("Current tab favicon: " + favicon); */
+  // 使用tabId执行内容脚本
+  chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    files: ['content_script.js'] 
+  }); 
+});
+
+// 监听来自background.js的消息
+let siteVolume;
+//chrome.runtime.connect();
+chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  console.log("message:"+message.hasPlayingElement);
+  if (message.hasPlayingElement) {
+    siteVolume = message.volume;
+    // 如果存在播放元素，将输入框设置为可编辑，并填入当前域名
+    document.getElementById("siteNameInput").readOnly = false;
+    document.getElementById("siteNameInput").value = message.currentDomain;
+  } else {
+    // 如果没有播放元素，将输入框设置为只读，并添加提示文本
+    document.getElementById("siteNameInput").readOnly = true;
+    document.getElementById("siteNameInput").value = "No playing elements";
+  }
+});
+
+
 window.onload = function() {
-
-    // 获取输入框和当前页面的域名
-    const siteNameInput = document.getElementById("siteNameInput");
-    const currentSite = window.location.hostname;
-
-    // 检测当前页面是否包含播放元素，这里使用示例条件检测是否存在video元素
-    const hasPlayingElement = document.querySelector("video") !== null;
-
-    // 根据条件设置输入框的只读状态和内容
-    if (hasPlayingElement) {
-        siteNameInput.readOnly = false; // 如果有播放元素，使输入框可编辑
-        siteNameInput.value = currentSite; // 将当前域名填入输入框
-    } else {
-        siteNameInput.readOnly = true; // 如果没有播放元素，使输入框只读
-        siteNameInput.value = "No playing elements"; // 或者设置其他提示信息
-    }
-
+  // 注册消息监听器
+  
     // 示例数据
-    const siteVolumes = {
+    /* const siteVolumes = {
       'YouTube': 0.5, 
       'Twitter': 0.8,
       'Bilibili': 0.6
-    };
+    }; */
   
     // 获取 DOM 元素
     const siteList = document.getElementById('siteList');
+    chrome.storage.local.get('mediaList', (result) => {
+      let resultMediaList = result.mediaList;
+      
+      // 创建网站音量设置列表
+      for (let i=0; i<resultMediaList.length;i++) {
+        console.log("result:"+resultMediaList[i])
+        //const volume = siteVolumes[site];
+    
+        const listItem = document.createElement('li');
+        listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
+    
+        listItem.innerHTML = `
+          <img class="w-10 h-10 bg-white-500 rounded-lg" src="${resultMediaList[i].logo}"></img>
+          <div class="ml-4 flex-grow">
+            <strong class="block mb-1">${resultMediaList[i].url}</strong>
+            <input class="w-full" type="range" min="0" max="1" step="0.1" value="${resultMediaList[i].volume}"> 
+          </div>
+          <span id="volumevalue" class="text-right w-10 mt-4">${resultMediaList[i].volume * 100}%</span>
+        `;
+    
+        siteList.appendChild(listItem);
+    
+        // 监听滑动条变化
+        const rangeInput = listItem.querySelector('input[type="range"]');
+        rangeInput.addEventListener('input', handleRangeChange);
+    
+      }
+    })
   
-    // 创建网站音量设置列表
-    for (const site in siteVolumes) {
-  
-      const volume = siteVolumes[site];
-  
-      const listItem = document.createElement('li');
-      listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
-  
-      listItem.innerHTML = `
-        <div class="w-10 h-10 bg-blue-500 rounded-full"></div>
-        <div class="ml-4 flex-grow">
-          <strong class="block mb-1">${site}</strong>
-          <input class="w-full" type="range" min="0" max="1" step="0.1" value="${volume}"> 
-        </div>
-        <span id="volumevalue" class="text-right w-10 mt-4">${volume * 100}%</span>
-      `;
-  
-      siteList.appendChild(listItem);
-  
-      // 监听滑动条变化
-      const rangeInput = listItem.querySelector('input[type="range"]');
-      rangeInput.addEventListener('input', handleRangeChange);
-  
-    }
+    
   
     // 处理滑动条变化
     function handleRangeChange(event) {
@@ -84,6 +109,25 @@ window.onload = function() {
           });
         });
       
-      }
+    }
+
+    // 监听"Add"按钮的点击事件
+  document.getElementById("addSiteButton").addEventListener("click", function() {
+      let mediaList = [];
+      let url = document.getElementById("siteNameInput").value;
+      const siteInfo = {
+        url: url,
+        logo: favicon,
+        volume: siteVolume,
+      };
+      chrome.storage.local.get('mediaList', (result) => {
+
+        let resultMediaList = result.mediaList || [];
+        mediaList = Array.from(resultMediaList);
+        mediaList.push(siteInfo);
+        chrome.storage.local.set({"mediaList" : mediaList});
+      })
+    })
+
   
   }
