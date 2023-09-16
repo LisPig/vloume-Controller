@@ -36,6 +36,12 @@ function checkMedia() {
         // 处理返回值 
       });
     
+    }else{
+      chrome.runtime.sendMessage({
+        hasPlayingElement: false
+      }, function(response) {
+        // 处理返回值 
+      });
     }
   
   }

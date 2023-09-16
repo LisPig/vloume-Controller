@@ -17,6 +17,7 @@ chrome.tabs.query({active: true,currentWindow: true }, function(tabs) {
 
 // 监听来自background.js的消息
 let siteVolume;
+const addButton = document.getElementById("addSiteButton");
 //chrome.runtime.connect();
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   console.log("message:"+message.hasPlayingElement);
@@ -25,24 +26,23 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     // 如果存在播放元素，将输入框设置为可编辑，并填入当前域名
     document.getElementById("siteNameInput").readOnly = false;
     document.getElementById("siteNameInput").value = message.currentDomain;
+
+    addButton.classList.remove("bg-gray-400", "cursor-not-allowed");
+    addButton.classList.add("bg-blue-500", "cursor-pointer");
+    addButton.disabled = false;
   } else {
+    addButton.classList.remove("bg-blue-500", "cursor-pointer");
+    addButton.classList.add("bg-gray-400", "cursor-not-allowed");
+    addButton.disabled = true;
     // 如果没有播放元素，将输入框设置为只读，并添加提示文本
-    document.getElementById("siteNameInput").readOnly = true;
-    document.getElementById("siteNameInput").value = "No playing elements";
+    document.getElementById("siteNameInput").readOnly = false;
+    document.getElementById("siteNameInput").value = "No playing elements";    
   }
 });
 
 
 window.onload = function() {
-  // 注册消息监听器
-  
-    // 示例数据
-    /* const siteVolumes = {
-      'YouTube': 0.5, 
-      'Twitter': 0.8,
-      'Bilibili': 0.6
-    }; */
-  
+
     // 获取 DOM 元素
     const siteList = document.getElementById('siteList');
     chrome.storage.local.get('mediaList', (result) => {
