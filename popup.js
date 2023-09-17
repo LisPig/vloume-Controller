@@ -1,10 +1,10 @@
-let url;
+let currentUrl;
 let favicon;
 
 chrome.tabs.query({active: true,currentWindow: true }, function(tabs) {
   var tabId = tabs[0].id;
   console.log("tabId:"+tabId)
-  url = tabs[0].url;
+  currentUrl = tabs[0].url;
   favicon = tabs[0].favIconUrl;
   /* console.log("Current tab URL: " + url); 
   console.log("Current tab favicon: " + favicon); */
@@ -42,16 +42,24 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
 
 
 window.onload = function() {
-
+  const addButton = document.getElementById("addSiteButton");
+  refreshSiteList();
+  function refreshSiteList() {
     // 获取 DOM 元素
     const siteList = document.getElementById('siteList');
     chrome.storage.local.get('mediaList', (result) => {
-      let resultMediaList = result.mediaList;
+      let resultMediaList =  [...new Set(result.mediaList)];
       
       // 创建网站音量设置列表
       for (let i=0; i<resultMediaList.length;i++) {
         console.log("result:"+resultMediaList[i])
         //const volume = siteVolumes[site];
+        // 如果已经存在站点信息并且站点URL匹配，禁用"Add"按钮
+        if (resultMediaList[i].url === currentUrl) {
+          addButton.classList.remove("bg-blue-500", "cursor-pointer");
+          addButton.classList.add("bg-gray-400", "cursor-not-allowed");
+          addButton.disabled = true;
+        }
     
         const listItem = document.createElement('li');
         listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
@@ -73,8 +81,7 @@ window.onload = function() {
     
       }
     })
-  
-    
+    }
   
     // 处理滑动条变化
     function handleRangeChange(event) {
@@ -114,9 +121,9 @@ window.onload = function() {
     // 监听"Add"按钮的点击事件
   document.getElementById("addSiteButton").addEventListener("click", function() {
       let mediaList = [];
-      let url = document.getElementById("siteNameInput").value;
+      let currentUrl = document.getElementById("siteNameInput").value;
       const siteInfo = {
-        url: url,
+        url: currentUrl,
         logo: favicon,
         volume: siteVolume,
       };
@@ -124,9 +131,18 @@ window.onload = function() {
 
         let resultMediaList = result.mediaList || [];
         mediaList = Array.from(resultMediaList);
+         // 检查是否存在
+        const exists = mediaList.some(item => item.url === currentUrl);
+        // 如果已存在,不再添加
+        if(exists) {
+          return; 
+        }
         mediaList.push(siteInfo);
         chrome.storage.local.set({"mediaList" : mediaList});
+        // 调用刷新站点列表的函数
+        refreshSiteList();
       })
+       
     })
 
   
