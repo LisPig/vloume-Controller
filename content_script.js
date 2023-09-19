@@ -15,7 +15,7 @@ if (audios.length > 0 || videos.length > 0) {
   // 向popup.js发送消息，包括检查结果和当前域名
   chrome.runtime.sendMessage({ hasPlayingElement, currentDomain });
 } */
-
+checkMedia();
 function checkMedia() {
 
     const mediaEls = document.querySelectorAll('video, audio');
@@ -44,9 +44,19 @@ function checkMedia() {
       });
     }
   
+}
+chrome.runtime.onMessage.addListener(function (message,sender, sendResponse) {
+  if(message.type === 'siteVolume'){
+    let volume = message.volume;
+    const mediaElements = document.querySelectorAll('video, audio');
+
+    for (const element of mediaElements) {
+
+      element.volume=volume;
+    
+    }
   }
-  
-  checkMedia();
+})
 
 
 

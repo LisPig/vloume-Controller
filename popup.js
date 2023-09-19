@@ -1,8 +1,8 @@
 let currentUrl;
 let favicon;
-
+let tabId;
 chrome.tabs.query({active: true,currentWindow: true }, function(tabs) {
-  var tabId = tabs[0].id;
+  tabId = tabs[0].id;
   console.log("tabId:"+tabId)
   currentUrl = tabs[0].url;
   favicon = tabs[0].favIconUrl;
@@ -43,13 +43,14 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
 
 window.onload = function() {
   const addButton = document.getElementById("addSiteButton");
-  refreshSiteList();
-  function refreshSiteList() {
-    // 获取 DOM 元素
-    const siteList = document.getElementById('siteList');
+  // 获取 DOM 元素
+  const siteList = document.getElementById('siteList');
+  let mediaList = [];
+  
+    
     chrome.storage.local.get('mediaList', (result) => {
       let resultMediaList =  [...new Set(result.mediaList)];
-      
+      mediaList = resultMediaList;
       // 创建网站音量设置列表
       for (let i=0; i<resultMediaList.length;i++) {
         console.log("result:"+resultMediaList[i])
@@ -68,7 +69,7 @@ window.onload = function() {
           <img class="w-10 h-10 bg-white-500 rounded-lg" src="${resultMediaList[i].logo}"></img>
           <div class="ml-4 flex-grow">
             <strong class="block mb-1">${resultMediaList[i].url}</strong>
-            <input class="w-full" type="range" min="0" max="1" step="0.1" value="${resultMediaList[i].volume}"> 
+            <input class="w-full" type="range" min="0" max="1" step="0.1" value="${resultMediaList[i].volume}" data-site="${resultMediaList[i].url}"> 
           </div>
           <span id="volumevalue" class="text-right w-10 mt-4">${resultMediaList[i].volume * 100}%</span>
         `;
@@ -81,7 +82,7 @@ window.onload = function() {
     
       }
     })
-    }
+    
   
     // 处理滑动条变化
     function handleRangeChange(event) {
@@ -91,7 +92,13 @@ window.onload = function() {
         const volume = parseFloat(event.target.value);
       
         // 更新示例数据
-        siteVolumes[site] = volume;
+        // 找到对应的列表项
+        const item = mediaList.find(item => item.url === site);
+        item.volume = volume;
+        // 获得更新项的索引
+        const index = mediaList.findIndex(item => item.url === site);
+        // 用新项替换旧项
+        mediaList.splice(index, 1, item);
       
         // 更新页面显示
         const volumePercentage = volume * 100;
@@ -104,17 +111,22 @@ window.onload = function() {
         textSpan.textContent = `${volumePercentage}%`;
       
         // 保存到本地存储
-        browser.storage.local.set({
-          [site]: volume
+        chrome.storage.local.set({
+          "mediaList": mediaList
         });
       
         // 降低音量
-        browser.tabs.query({active: true, currentWindow: true}, tabs => {
+        //如果当前站点对应调节的站点，那就进行通信同步音量
+        if(document.getElementById("siteNameInput").value === site){
+          chrome.runtime.sendMessage({type:'siteVolume',tabId, site,volume});
+        }
+        
+        /* browser.tabs.query({active: true, currentWindow: true}, tabs => {
           browser.tabs.sendMessage(tabs[0].id, {
             site, 
             volume 
           });
-        });
+        }); */
       
     }
 
@@ -140,10 +152,26 @@ window.onload = function() {
         mediaList.push(siteInfo);
         chrome.storage.local.set({"mediaList" : mediaList});
         // 调用刷新站点列表的函数
-        refreshSiteList();
+        insertItem(siteInfo);
       })
        
     })
 
-  
+    // 插入单个列表项 
+    function insertItem(siteInfo) {
+
+      const listItem = document.createElement('li');
+        listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
+    
+        listItem.innerHTML = `
+          <img class="w-10 h-10 bg-white-500 rounded-lg" src="${siteInfo.logo}"></img>
+          <div class="ml-4 flex-grow">
+            <strong class="block mb-1">${siteInfo.url}</strong>
+            <input class="w-full" type="range" min="0" max="1" step="0.1" value="${siteInfo.volume}"> 
+          </div>
+          <span id="volumevalue" class="text-right w-10 mt-4">${siteInfo.volume * 100}%</span>
+        `;
+    
+        siteList.appendChild(listItem);
+    }
   }

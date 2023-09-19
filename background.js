@@ -9,6 +9,13 @@ chrome.runtime.onMessage.addListener(function (message,sender, sendResponse) {
       } else {
         hasPlayingElement == false;
       }
+    
+    if(message.type === 'siteVolume'){
+      const site = message.site;
+      const volume = message.volume;
+      const tabId = message.tabId;
+      chrome.tabs.sendMessage(tabId,{type:'siteVolume',site,volume})
+    }
 });
 
 /* chrome.runtime.onConnect.addListener(function (message,sender, sendResponse) {
