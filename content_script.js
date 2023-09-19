@@ -18,12 +18,15 @@ if (audios.length > 0 || videos.length > 0) {
 checkMedia();
 function checkMedia() {
 
+  const audio = document.getElementsByTagName('audio');
+//const audiovolume = audio.volume;
     const mediaEls = document.querySelectorAll('video, audio');
     let volume;
     if (mediaEls.length > 0) {
       for (let i = 0; i < mediaEls.length; i++) {
         const element = mediaEls[i];
         volume = element.volume;
+        mediaEls[i].addEventListener('volumechange', handleVolumeChange);
       }
     
       const currentDomain = window.location.hostname;
@@ -57,7 +60,40 @@ chrome.runtime.onMessage.addListener(function (message,sender, sendResponse) {
     }
   }
 })
+//监测页面音量更改
+// 选择所有视频和音频元素
+/* const mediaEls = document.querySelectorAll('video, audio'); 
 
+// 遍历添加事件监听
+for (let el of mediaEls) {
+
+  el.addEventListener('volumechange', handleVolumeChange);
+
+} */
+
+function handleVolumeChange(event) {
+  const site = window.location.hostname;
+  // 获取元素和新音量
+  const el = event.target;
+  const newVolume = el.volume;
+
+  chrome.storage.local.get('mediaList', (result) => {
+    let mediaList =  [...new Set(result.mediaList)];
+
+    const item = mediaList.find(item => item.url === site);
+    item.volume = newVolume;
+    // 获得更新项的索引
+    const index = mediaList.findIndex(item => item.url === site);
+    // 用新项替换旧项
+    mediaList.splice(index, 1, item);
+    chrome.storage.local.set({
+      "mediaList": mediaList
+    });
+  })
+
+  
+
+}
 
 
 
