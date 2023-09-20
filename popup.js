@@ -8,11 +8,20 @@ chrome.tabs.query({active: true,currentWindow: true }, function(tabs) {
   favicon = tabs[0].favIconUrl;
   /* console.log("Current tab URL: " + url); 
   console.log("Current tab favicon: " + favicon); */
-  // 使用tabId执行内容脚本
-  chrome.scripting.executeScript({
-    target: { tabId: tabId },
-    files: ['content_script.js'] 
-  }); 
+  console.log(currentUrl)
+  if (/^chrome:\/\/extensions\//.test(currentUrl)) {
+    
+    const text = document.createElement('div');
+    text.textContent = 'The current page has no operation permission';
+    document.body.appendChild(text); 
+    return; 
+  }else{
+    // 使用tabId执行内容脚本
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      files: ['content_script.js'] 
+    }); 
+  }
 });
 
 // 监听来自background.js的消息
@@ -121,13 +130,6 @@ window.onload = function() {
           chrome.runtime.sendMessage({type:'siteVolume',tabId, site,volume});
         }
         
-        /* browser.tabs.query({active: true, currentWindow: true}, tabs => {
-          browser.tabs.sendMessage(tabs[0].id, {
-            site, 
-            volume 
-          });
-        }); */
-      
     }
 
     // 监听"Add"按钮的点击事件

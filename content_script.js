@@ -61,16 +61,6 @@ chrome.runtime.onMessage.addListener(function (message,sender, sendResponse) {
   }
 })
 //监测页面音量更改
-// 选择所有视频和音频元素
-/* const mediaEls = document.querySelectorAll('video, audio'); 
-
-// 遍历添加事件监听
-for (let el of mediaEls) {
-
-  el.addEventListener('volumechange', handleVolumeChange);
-
-} */
-
 function handleVolumeChange(event) {
   const site = window.location.hostname;
   // 获取元素和新音量
