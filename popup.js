@@ -75,7 +75,9 @@ window.onload = function() {
         listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
     
         listItem.innerHTML = `
-          <img class="w-10 h-10 bg-white-500 rounded-lg" src="${resultMediaList[i].logo}"></img>
+          <div class="w-8 h-8 mr-4 flex-none ring-2 ring-offset-2 ring-gray-200 display flex align-items-center justify-content-center">
+          <img  src="${resultMediaList[i].logo}" class="object-fit cover object-position 50% 50%"></img>
+          </div>
           <div class="ml-4 flex-grow">
             <strong class="block mb-1">${resultMediaList[i].url}</strong>
             <input class="w-full" type="range" min="0" max="1" step="0.1" value="${resultMediaList[i].volume}" data-site="${resultMediaList[i].url}"> 
@@ -166,7 +168,9 @@ window.onload = function() {
         listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
     
         listItem.innerHTML = `
-          <img class="w-10 h-10 bg-white-500 rounded-lg" src="${siteInfo.logo}"></img>
+          <div class="w-8 h-8 mr-4 flex-none ring-2 ring-offset-2 ring-gray-200 display flex align-items-center justify-content-center">
+          <img  src="${siteInfo.logo}" class="object-fit cover object-position 50% 50%"></img>
+          </div>
           <div class="ml-4 flex-grow">
             <strong class="block mb-1">${siteInfo.url}</strong>
             <input class="w-full" type="range" min="0" max="1" step="0.1" value="${siteInfo.volume}"> 
