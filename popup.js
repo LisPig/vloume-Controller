@@ -180,4 +180,9 @@ window.onload = function() {
     
         siteList.appendChild(listItem);
     }
+
+    let settingMenu = document.getElementById("settingMenu");
+    settingMenu.onclick = function(){
+      window.open("option.html")
+    }
   }
