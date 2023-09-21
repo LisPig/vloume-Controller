@@ -11,7 +11,7 @@
     "tabs"
   ],
   "host_permissions": [
-    
+    "https://cdn.jsdelivr.net/*",
     "http://*/*",
     "https://*/*"
   ],

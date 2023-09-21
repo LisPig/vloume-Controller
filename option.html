@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+        <meta charset="utf-8" /> 
+        <script src="option.js"></script>
+        <!-- <link href="dist/tailwind.css" rel="stylesheet"> -->
+        <link href="dist/output.css" rel="stylesheet">
+    </head>
+
+    <body>
+        <div class="container mx-auto mt-12 h-96">  
+            <h2 class="text-lg p-4">Vloume Controller</h2>
+            <div id="app" class="flex items-center">
+                <!-- 侧边菜单栏 -->
+                <div class="w-1/6 p-4">
+                    <ul class="py-4">
+                        <li class="p-2 text-md hover:bg-gray-100 cursor-pointer shadow-md rounded-lg" data-id="option1">MedaiList</li> 
+                        <li class="p-2 text-md hover:bg-gray-100 cursor-pointer shadow-md rounded-lg" data-id="option2">About</li> 
+                    </ul>
+                </div>
+                
+                <!-- 内容框 -->
+                <div class="max-w-md bg-white p-4">
+                    <div id="option1" class="hidden"> 
+                        <h1 class="text-xl font-bold">Option 1</h1> 
+                        <p class="text-sm text-gray-600">This is the content for option 1.</p> 
+                    </div> 
+                    <div id="option2" class="hidden"> 
+                        <h1 class="text-xl font-bold">Option 2</h1> 
+                        <p class="text-sm text-gray-600">This is the content for option 2.</p> 
+                    </div> 
+                    <div id="option3" class="hidden"> 
+                        <h1 class="text-xl font-bold">Option 3</h1> 
+                        <p class="text-sm text-gray-600">This is the content for option 3.</p> 
+                    </div> 
+                </div>
+            </div>
+         </div>
+    </body>
+</html>
+    
