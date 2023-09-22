@@ -11,9 +11,9 @@ chrome.tabs.query({active: true,currentWindow: true }, function(tabs) {
   console.log(currentUrl)
   if (/^chrome:\/\/extensions\//.test(currentUrl)) {
     
-    const text = document.createElement('div');
+    /* const text = document.createElement('div');
     text.textContent = 'The current page has no operation permission';
-    document.body.appendChild(text); 
+    document.body.appendChild(text);  */
     return; 
   }else{
     // 使用tabId执行内容脚本
