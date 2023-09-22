@@ -17,9 +17,6 @@ if (audios.length > 0 || videos.length > 0) {
 } */
 checkMedia();
 function checkMedia() {
-
-  const audio = document.getElementsByTagName('audio');
-//const audiovolume = audio.volume;
     const mediaEls = document.querySelectorAll('video, audio');
     let volume;
     if (mediaEls.length > 0) {
@@ -35,15 +32,11 @@ function checkMedia() {
         hasPlayingElement: true,
         volume,
         currentDomain 
-      }, function(response) {
-        // 处理返回值 
       });
     
     }else{
       chrome.runtime.sendMessage({
         hasPlayingElement: false
-      }, function(response) {
-        // 处理返回值 
       });
     }
   
