@@ -75,8 +75,8 @@ window.onload = function() {
         listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
     
         listItem.innerHTML = `
-          <div class="w-8 h-8 mr-4 flex-none ring-2 ring-offset-2 ring-gray-200 display flex align-items-center justify-content-center">
-          <img  src="${resultMediaList[i].logo}" class="object-fit cover object-position 50% 50%"></img>
+          <div class="w-8 h-8 flex-none display flex align-items-center justify-content-center">
+            <img  src="${resultMediaList[i].logo}" class="object-fit cover object-position 50% 50%"></img>
           </div>
           <div class="ml-4 flex-grow">
             <strong class="block mb-1">${resultMediaList[i].url}</strong>
@@ -168,7 +168,7 @@ window.onload = function() {
         listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
     
         listItem.innerHTML = `
-          <div class="w-8 h-8 mr-4 flex-none ring-2 ring-offset-2 ring-gray-200 display flex align-items-center justify-content-center">
+          <div class="w-8 h-8 flex-none  display flex align-items-center justify-content-center">
           <img  src="${siteInfo.logo}" class="object-fit cover object-position 50% 50%"></img>
           </div>
           <div class="ml-4 flex-grow">

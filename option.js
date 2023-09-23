@@ -47,7 +47,7 @@ window.onload = function(){
                     <strong class="block mb-1">${resultMediaList[i].url}</strong>
                     <input class="w-full" type="range" min="0" max="1" step="0.1" value="${resultMediaList[i].volume}" data-site="${resultMediaList[i].url}"> 
                 </div>
-                <span id="volumevalue" class="text-right w-10 mt-4">${resultMediaList[i].volume * 100}%</span>
+                <span id="volumevalue" class="text-right w-10 mt-4">${parseInt(resultMediaList[i].volume * 100)}%</span>
                 <span id="remove" class="w-5 h-5 ml-3 mt-4" data-site="${resultMediaList[i].url}" >
                     
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 icon hover:text-red-500" data-site="${resultMediaList[i].url}">
