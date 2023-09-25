@@ -6,7 +6,8 @@
 checkMedia();
 linkage();
 function checkMedia() {
-const mediaEls = document.querySelectorAll('video, audio');
+    const mediaEls = document.querySelectorAll('video, audio');
+    const vedio = document.querySelector('video');
     let volume;
     if (mediaEls.length > 0) {
       for (let i = 0; i < mediaEls.length; i++) {

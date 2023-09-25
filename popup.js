@@ -175,7 +175,7 @@ window.onload = function() {
             <strong class="block mb-1">${siteInfo.url}</strong>
             <input class="w-full" type="range" min="0" max="1" step="0.1" value="${siteInfo.volume}"> 
           </div>
-          <span id="volumevalue" class="text-right w-10 mt-4">${siteInfo.volume * 100}%</span>
+          <span id="volumevalue" class="text-right w-10 mt-4">${parseInt(siteInfo.volume * 100)}%</span>
         `;
     
         siteList.appendChild(listItem);
