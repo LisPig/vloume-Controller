@@ -5,15 +5,15 @@
   
   "description": "",
   "permissions": [
+    "tabCapture",
     "activeTab",
     "storage",
     "scripting",
     "tabs"
+    
   ],
   "host_permissions": [
-    "https://cdn.jsdelivr.net/*",
-    "http://*/*",
-    "https://*/*"
+    "<all_urls>"
   ],
   "icons": {
     "16": "images/logo125.png",
