@@ -16,19 +16,9 @@ chrome.tabs.query({active: true, currentWindow: true }, function(tabs) {
   if (/^chrome:\/\/extensions\//.test(currentUrl)) {
     return; 
   } else {
-    // **依赖manifest.json中的自动注入，不再手动注入**
-    console.log('Popup: Relying on manifest.json content script auto-injection');
-    
-    // 等待一下让content script自动注入并初始化，然后强制检查
-    setTimeout(() => {
-      chrome.tabs.sendMessage(tabId, {type: 'forceRecheck'}, (response) => {
-        if (chrome.runtime.lastError) {
-          console.warn('Popup: Content script not ready yet, will retry when needed');
-        } else {
-          console.log('Popup: Content script is ready and media elements checked');
-        }
-      });
-    }, 1500); // 增加等待时间让自动注入完成
+    // **改进的content script就绪检测机制**
+    console.log('Popup: Checking content script readiness...');
+    checkContentScriptReadiness();
   }
 });
 
@@ -99,28 +89,137 @@ function handleRangeChange(event) {
   console.log(`Adjusting volume for ${site}, current domain: ${currentDomain}`);
   
   if (currentDomain === site) {
-    // **直接发送消息给content script，不通过background**
-    chrome.tabs.sendMessage(tabId, {type: 'siteVolume', site, volume}, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('Popup: Error sending siteVolume message directly to content script:', chrome.runtime.lastError.message);
-        
-        // 如果发送失败，等待一下再重试（content script可能还在初始化）
-        console.log('Popup: First attempt failed, waiting and retrying...');
-        setTimeout(() => {
-          chrome.tabs.sendMessage(tabId, {type: 'siteVolume', site, volume}, (retryResponse) => {
-            if (chrome.runtime.lastError) {
-              console.error('Popup: Retry also failed:', chrome.runtime.lastError.message);
-              console.log('Popup: Content script may not be ready. Please try adjusting volume again.');
-            } else {
-              console.log('Popup: Retry successful - volume applied directly!');
-            }
-          });
-        }, 2000); // 等待2秒再重试
-      } else {
-        console.log(`Applied volume ${volume} to current page ${site} - direct message successful!`);
-      }
-    });
+    // **使用增强的消息发送机制**
+    sendVolumeChangeWithRetry(site, volume, 0);
   }
+}
+
+// **新增：增强的消息发送机制，带有智能重试**
+function sendVolumeChangeWithRetry(site, volume, retryCount = 0) {
+  const maxRetries = 5;
+  const baseDelay = 200; // 基础延迟200ms
+  
+  // 计算指数退避延迟：200ms, 400ms, 800ms, 1600ms, 3200ms
+  const delay = baseDelay * Math.pow(2, retryCount);
+  
+  console.log(`Attempt ${retryCount + 1}/${maxRetries + 1} to send volume message - site: ${site}, volume: ${volume}`);
+  
+  // 先尝试直接发送消息到content script
+  chrome.tabs.sendMessage(tabId, {type: 'siteVolume', site, volume}, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn(`Direct message attempt ${retryCount + 1} failed:`, chrome.runtime.lastError.message);
+      
+      if (retryCount < maxRetries) {
+        console.log(`Retrying in ${delay}ms...`);
+        setTimeout(() => {
+          sendVolumeChangeWithRetry(site, volume, retryCount + 1);
+        }, delay);
+      } else {
+        // 所有直接重试都失败了，尝试通过content script重新注入的方式
+        console.warn('All direct attempts failed, trying alternative approach...');
+        tryAlternativeVolumeApplication(site, volume);
+      }
+    } else {
+      console.log(`✓ Volume ${volume} successfully applied to ${site} on attempt ${retryCount + 1}`);
+      // 可选：显示成功反馈给用户
+      showVolumeAppliedFeedback(site, volume);
+    }
+  });
+}
+
+// **新增：替代方案 - 通过background script重新检查content script状态**
+function tryAlternativeVolumeApplication(site, volume) {
+  console.log('Trying alternative volume application method...');
+  
+  // 1. 先通知content script强制重新检查媒体元素
+  chrome.tabs.sendMessage(tabId, {type: 'forceRecheck'}, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn('Force recheck also failed, trying script injection approach...');
+      // 2. 如果还是失败，尝试重新检查content script是否存在
+      tryScriptReinjection(site, volume);
+    } else {
+      // 3. 重新检查成功后，再次尝试发送音量消息
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tabId, {type: 'siteVolume', site, volume}, (finalResponse) => {
+          if (chrome.runtime.lastError) {
+            console.error('Final attempt also failed:', chrome.runtime.lastError.message);
+            showVolumeErrorFeedback(site);
+          } else {
+            console.log(`✓ Volume ${volume} applied to ${site} via alternative method`);
+            showVolumeAppliedFeedback(site, volume);
+          }
+        });
+      }, 1000);
+    }
+  });
+}
+
+// **新增：脚本重新检查和注入确认**
+function tryScriptReinjection(site, volume) {
+  console.log('Checking if content script needs reconfirmation...');
+  
+  // 发送一个简单的ping消息来检查content script状态
+  chrome.tabs.sendMessage(tabId, {type: 'ping'}, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error('Content script appears to be missing, user may need to refresh the page');
+      showScriptMissingError();
+    } else {
+      // content script存在但之前的消息失败了，再试一次
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tabId, {type: 'siteVolume', site, volume}, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('Even after script confirmation, volume setting failed');
+            showVolumeErrorFeedback(site);
+          } else {
+            console.log(`✓ Volume ${volume} applied to ${site} after script reconfirmation`);
+            showVolumeAppliedFeedback(site, volume);
+          }
+        });
+      }, 500);
+    }
+  });
+}
+
+// **新增：用户反馈函数**
+function showVolumeAppliedFeedback(site, volume) {
+  // 可以在这里添加视觉反馈，比如短暂的绿色边框或成功图标
+  const listItem = siteList.querySelector(`input[data-site="${site}"]`).closest('li');
+  if (listItem) {
+    listItem.style.borderLeft = '3px solid #10b981'; // 绿色边框表示成功
+    setTimeout(() => {
+      listItem.style.borderLeft = '';
+    }, 2000);
+  }
+}
+
+function showVolumeErrorFeedback(site) {
+  // 红色边框表示失败
+  const listItem = siteList.querySelector(`input[data-site="${site}"]`).closest('li');
+  if (listItem) {
+    listItem.style.borderLeft = '3px solid #ef4444'; // 红色边框表示失败
+    setTimeout(() => {
+      listItem.style.borderLeft = '';
+    }, 3000);
+  }
+  console.warn(`Volume adjustment for ${site} failed. Page may need to be refreshed.`);
+}
+
+function showScriptMissingError() {
+  // 显示更明显的错误提示
+  const errorDiv = document.createElement('div');
+  errorDiv.style.cssText = `
+    position: fixed; top: 10px; left: 10px; right: 10px;
+    background: #fee2e2; border: 1px solid #fca5a5; color: #b91c1c;
+    padding: 8px; border-radius: 4px; font-size: 12px; z-index: 1000;
+  `;
+  errorDiv.textContent = 'Content script not responding. Please refresh the page and try again.';
+  document.body.appendChild(errorDiv);
+  
+  setTimeout(() => {
+    if (errorDiv.parentNode) {
+      errorDiv.parentNode.removeChild(errorDiv);
+    }
+  }, 5000);
 }
 
 function updateSiteVolume(site, volume) {
@@ -185,4 +284,68 @@ function insertItem(siteInfo) {
   // 监听滑动条变化
   const rangeInput = listItem.querySelector('input[type="range"]');
   rangeInput.addEventListener('input', handleRangeChange);
+}
+
+// **新增：智能的content script就绪检测**
+function checkContentScriptReadiness(attempt = 1) {
+  const maxAttempts = 10;
+  const baseDelay = 300; // 基础延迟300ms
+  
+  console.log(`Checking content script readiness - attempt ${attempt}/${maxAttempts}`);
+  
+  chrome.tabs.sendMessage(tabId, {type: 'ping'}, (response) => {
+    if (chrome.runtime.lastError) {
+      if (attempt < maxAttempts) {
+        console.log(`Content script not ready yet, retrying in ${baseDelay * attempt}ms...`);
+        setTimeout(() => {
+          checkContentScriptReadiness(attempt + 1);
+        }, baseDelay * attempt); // 逐渐增加延迟
+      } else {
+        console.warn('Content script failed to initialize after maximum attempts');
+        // 显示警告但不阻止用户使用
+        showInitializationWarning();
+      }
+    } else {
+      console.log('✓ Content script is ready and responsive');
+      // Content script准备就绪，现在进行强制检查
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tabId, {type: 'forceRecheck'}, (recheckResponse) => {
+          if (chrome.runtime.lastError) {
+            console.warn('Force recheck failed, but content script is responsive');
+          } else {
+            console.log('✓ Media elements recheck completed successfully');
+          }
+        });
+      }, 200);
+    }
+  });
+}
+
+// **新增：初始化警告显示**
+function showInitializationWarning() {
+  const warningDiv = document.createElement('div');
+  warningDiv.style.cssText = `
+    background: #fef3c7; border: 1px solid #f59e0b; color: #92400e;
+    padding: 8px; margin: 10px; border-radius: 4px; font-size: 12px;
+    text-align: center;
+  `;
+  warningDiv.innerHTML = `
+    <strong>Notice:</strong> Content script initialization is slow<br>
+    <small>If volume control doesn't respond, please refresh the page and try again</small>
+  `;
+  
+  // 插入到popup的顶部
+  const popup = document.body;
+  if (popup.firstChild) {
+    popup.insertBefore(warningDiv, popup.firstChild);
+  } else {
+    popup.appendChild(warningDiv);
+  }
+  
+  // 10秒后自动移除警告
+  setTimeout(() => {
+    if (warningDiv.parentNode) {
+      warningDiv.parentNode.removeChild(warningDiv);
+    }
+  }, 10000);
 }

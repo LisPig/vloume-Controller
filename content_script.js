@@ -1,97 +1,128 @@
 // content_script.js
 
-// 全局变量
+// Global variables
 let mediaObserver = null;
 let playingElements = new Set();
 let mediaDetectionInterval = null;
 let lastKnownVolume = 1.0;
-let hasNotifiedPopup = false; // 防止重复通知
+let hasNotifiedPopup = false; // Prevent duplicate notifications
+let isInitialized = false; // **New: Initialization status flag**
 
-// 初始化
+// **Optimized initialization process**
 initialize();
 
 function initialize() {
-    console.log('Content script initialized');
-    
-    // 等待DOM完全加载
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            setupMediaDetection();
-        });
-    } else {
-        setupMediaDetection();
+    if (isInitialized) {
+        console.log('Content script already initialized, skipping...');
+        return;
     }
     
-    // 设置linkage功能
-    linkage();
+    console.log('Content script initializing...');
+    
+    try {
+        // Wait for DOM to fully load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                finishInitialization();
+            });
+        } else {
+            // DOM is already loaded
+            finishInitialization();
+        }
+    } catch (error) {
+        console.error('Error during content script initialization:', error);
+        // Even if initialization fails, mark as initialized to prevent repeated attempts
+        isInitialized = true;
+    }
 }
 
-// 设置全面的媒体检测
+// **New: Function to finish initialization**
+function finishInitialization() {
+    try {
+        console.log('Finishing content script initialization...');
+        
+        // Setup linkage functionality
+        linkage();
+        
+        // Setup media detection (delayed to give page more time to load)
+        setTimeout(() => {
+            setupMediaDetection();
+            isInitialized = true;
+            console.log('✓ Content script fully initialized and ready');
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error finishing initialization:', error);
+        isInitialized = true; // Mark as initialized even if failed
+    }
+}
+
+// Setup comprehensive media detection
 function setupMediaDetection() {
-    // 1. 初始检测
+    // 1. Initial detection
     checkMedia();
     
-    // 2. 设置DOM变化观察者
+    // 2. Setup DOM change observer
     setupMutationObserver();
     
-    // 3. 设置定期检测
+    // 3. Setup periodic check
     startPeriodicCheck();
     
-    // 4. 监听页面可见性变化
+    // 4. Listen for page visibility change
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // 5. 监听页面focus/blur事件
+    // 5. Listen for page focus/blur events
     window.addEventListener('focus', checkMedia);
     window.addEventListener('blur', checkMedia);
 }
 
-// 主要的媒体元素检测函数 - 保持原有逻辑，但增强检测能力
+// Main media element detection function - keep original logic, but enhance detection capability
 function checkMedia() {
     console.log('Starting comprehensive media detection...');
     
     try {
-        // 1. 检测直接的audio和video元素
+        // 1. Detect direct audio and video elements
         const directMediaElements = detectDirectMediaElements();
         
-        // 2. 检测iframe中的媒体元素
+        // 2. Detect media elements in iframes
         const iframeMediaElements = detectIframeMediaElements();
         
-        // 3. 检测其他音频源
+        // 3. Detect other audio sources
         const otherAudioSources = detectOtherAudioSources();
         
-        // 合并所有检测到的元素
+        // Merge all detected elements
         const allDetectedElements = [
             ...directMediaElements,
             ...iframeMediaElements,
             ...otherAudioSources
         ];
         
-        // 更新播放元素集合
+        // Update playing element set
         updatePlayingElements(allDetectedElements);
         
-        // **关键：按照原有逻辑通知popup**
+        // **Key: Notify popup according to original logic**
         notifyPopupOfMediaElements(allDetectedElements);
         
         console.log(`Media detection completed. Found ${allDetectedElements.length} total elements, ${playingElements.size} playing`);
         
     } catch (error) {
         console.error('Error in media detection:', error);
-        // 即使出错也要通知popup没有播放元素
+        // Even if error, notify popup that there are no playing elements
         notifyPopupOfMediaElements([]);
     }
 }
 
-// 按照原有逻辑通知popup
+// Notify popup according to original logic
 function notifyPopupOfMediaElements(elements) {
     const currentDomain = window.location.hostname;
     
-    // 筛选出真正的媒体元素（audio/video）
+    // Filter out actual media elements (audio/video)
     const realMediaElements = elements.filter(el => 
         el.type === 'audio' || el.type === 'video'
     );
     
     if (realMediaElements.length > 0) {
-        // 获取第一个有效元素的音量
+        // Get volume of the first valid element
         let volume = 1.0;
         const firstPlayingElement = realMediaElements.find(el => el.volume !== undefined);
         if (firstPlayingElement) {
@@ -99,7 +130,7 @@ function notifyPopupOfMediaElements(elements) {
             lastKnownVolume = volume;
         }
         
-        // **按照原有格式发送消息给background，然后转发给popup**
+        // **Send message to background according to original format, then forward to popup**
         chrome.runtime.sendMessage({
             hasPlayingElement: true,
             volume: volume,
@@ -110,7 +141,7 @@ function notifyPopupOfMediaElements(elements) {
         console.log(`Notified popup: has playing elements on ${currentDomain}, volume: ${volume}`);
         
     } else {
-        // 没有播放元素
+        // No playing elements
         chrome.runtime.sendMessage({
             hasPlayingElement: false
         });
@@ -120,7 +151,7 @@ function notifyPopupOfMediaElements(elements) {
     }
 }
 
-// 检测直接的媒体元素
+// Detect direct media elements
 function detectDirectMediaElements() {
     const elements = [];
     const mediaElements = document.querySelectorAll('video, audio');
@@ -142,7 +173,7 @@ function detectDirectMediaElements() {
                 src: element.src || element.currentSrc || 'unknown'
             };
             
-            // 添加事件监听器
+            // Setup event listeners
             setupElementEventListeners(element);
             
             elements.push(elementInfo);
@@ -155,14 +186,14 @@ function detectDirectMediaElements() {
     return elements;
 }
 
-// 检测iframe中的媒体元素
+// Detect media elements in iframes
 function detectIframeMediaElements() {
     const elements = [];
     const iframes = document.querySelectorAll('iframe');
     
     iframes.forEach((iframe, index) => {
         try {
-            // 检查iframe是否可访问（同源策略限制）
+            // Check if iframe is accessible (same-origin policy restriction)
             if (iframe.contentDocument || iframe.contentWindow) {
                 const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
                 const iframeMediaElements = iframeDoc.querySelectorAll('video, audio');
@@ -185,7 +216,7 @@ function detectIframeMediaElements() {
                 });
             }
         } catch (error) {
-            // iframe跨域访问限制，这是正常情况
+            // iframe cross-origin access restriction, this is normal
             console.debug('Cannot access iframe content (cross-origin):', error.message);
         }
     });
@@ -193,12 +224,12 @@ function detectIframeMediaElements() {
     return elements;
 }
 
-// 检测其他音频源
+// Detect other audio sources
 function detectOtherAudioSources() {
     const elements = [];
     
     try {
-        // 1. 检测嵌入的Flash播放器
+        // 1. Detect embedded Flash players
         const embeds = document.querySelectorAll('embed[type*="flash"], object[type*="flash"]');
         embeds.forEach((embed, index) => {
             elements.push({
@@ -211,7 +242,7 @@ function detectOtherAudioSources() {
             });
         });
         
-        // 2. 检测Web Audio API使用的迹象
+        // 2. Detect signs of Web Audio API usage
         if (window.AudioContext || window.webkitAudioContext) {
             const scripts = document.querySelectorAll('script');
             let hasWebAudio = false;
@@ -243,9 +274,9 @@ function detectOtherAudioSources() {
     return elements;
 }
 
-// 设置元素事件监听器
+// Setup element event listeners
 function setupElementEventListeners(element) {
-    // 防止重复添加监听器
+    // Prevent duplicate adding listeners
     if (element.dataset.volumeControllerListeners) {
         return;
     }
@@ -258,7 +289,7 @@ function setupElementEventListeners(element) {
         element.addEventListener(eventType, (event) => {
             console.log(`Media event: ${eventType}`, element);
             
-            // 延迟检测以确保状态更新，重新通知popup
+            // Delay detection to ensure state update, re-notify popup
             setTimeout(() => {
                 checkMedia();
                 
@@ -270,7 +301,7 @@ function setupElementEventListeners(element) {
     });
 }
 
-// 设置DOM变化观察者
+// Setup DOM change observer
 function setupMutationObserver() {
     if (mediaObserver) {
         mediaObserver.disconnect();
@@ -306,19 +337,19 @@ function setupMutationObserver() {
     });
 }
 
-// 开始定期检查
+// Start periodic check
 function startPeriodicCheck() {
     if (mediaDetectionInterval) {
         clearInterval(mediaDetectionInterval);
     }
     
-    // 每10秒检查一次媒体状态（降低频率以减少性能影响）
+    // Check media status every 10 seconds (reduce frequency to reduce performance impact)
     mediaDetectionInterval = setInterval(() => {
         checkMedia();
     }, 10000);
 }
 
-// 处理页面可见性变化
+// Handle page visibility change
 function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
         console.log('Page became visible, checking media');
@@ -326,7 +357,7 @@ function handleVisibilityChange() {
     }
 }
 
-// 更新播放元素集合
+// Update playing element set
 function updatePlayingElements(elements) {
     playingElements.clear();
     elements.forEach(el => {
@@ -336,7 +367,7 @@ function updatePlayingElements(elements) {
     });
 }
 
-// linkage函数：为当前网站应用已保存的音量设置
+// linkage function: Set volume for saved media elements for current website
 function linkage() {
     const mediaElements = document.querySelectorAll('video, audio');
     const currentDomain = window.location.hostname;
@@ -360,30 +391,56 @@ function linkage() {
     }
 }
 
-// **保持原有的消息监听逻辑**
+// **Keep original message listening logic**
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     try {
-        // **关键：原有的siteVolume消息处理逻辑**
+        console.log('Content script received message:', message.type);
+        
+        // **New: ping message response, used to check content script status**
+        if (message.type === 'ping') {
+            console.log('Content script responding to ping');
+            sendResponse({status: 'alive', timestamp: Date.now()});
+            return true;
+        }
+        
+        // **Key: Original siteVolume message processing logic, enhanced error handling**
         if (message.type === 'siteVolume') {
             let volume = message.volume;
             const mediaElements = document.querySelectorAll('video, audio');
 
             console.log(`Content script received siteVolume message: volume=${volume}, elements found=${mediaElements.length}`);
 
+            if (mediaElements.length === 0) {
+                console.warn('No media elements found, but still responding to popup');
+                sendResponse({success: false, error: 'No media elements found', elementsUpdated: 0});
+                return true;
+            }
+
+            let successCount = 0;
             for (const element of mediaElements) {
-                element.volume = volume;
-                console.log(`Set volume ${volume} on element:`, element.tagName, element.src || element.currentSrc);
+                try {
+                    element.volume = volume;
+                    successCount++;
+                    console.log(`Set volume ${volume} on element:`, element.tagName, element.src || element.currentSrc);
+                } catch (err) {
+                    console.warn('Failed to set volume on element:', err);
+                }
             }
             
             lastKnownVolume = volume;
-            console.log(`Applied volume ${volume} from popup list control`);
+            console.log(`Applied volume ${volume} from popup list control to ${successCount}/${mediaElements.length} elements`);
             
-            // **发送响应确认消息已处理**
-            sendResponse({success: true, elementsUpdated: mediaElements.length});
-            return true; // 保持消息通道开放
+            // **Send detailed response confirming message processed**
+            sendResponse({
+                success: successCount > 0, 
+                elementsUpdated: successCount,
+                totalElements: mediaElements.length,
+                volume: volume
+            });
+            return true; // Keep message channel open
             
         } else if (message.type === 'getAudioStatus') {
-            // 立即检测并响应
+            // Immediately detect and respond
             checkMedia();
             setTimeout(() => {
                 const hasAudio = playingElements.size > 0 || 
@@ -396,23 +453,43 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             const volume = message.volume;
             const mediaElements = document.querySelectorAll('video, audio');
             
+            let successCount = 0;
             for (const element of mediaElements) {
-                element.volume = volume;
+                try {
+                    element.volume = volume;
+                    successCount++;
+                } catch (err) {
+                    console.warn('Failed to set volume on element:', err);
+                }
             }
             
             lastKnownVolume = volume;
-            console.log(`Volume set to ${volume}`);
+            console.log(`Volume set to ${volume} on ${successCount} elements`);
+            sendResponse({success: successCount > 0, elementsUpdated: successCount});
+            return true;
             
         } else if (message.type === 'forceRecheck') {
+            console.log('Content script performing forced media recheck');
             checkMedia();
+            // Give some time for detection to complete
+            setTimeout(() => {
+                const mediaElements = document.querySelectorAll('video, audio');
+                sendResponse({
+                    success: true, 
+                    mediaElementsFound: mediaElements.length,
+                    playingElements: playingElements.size
+                });
+            }, 200);
+            return true;
         }
     } catch (error) {
         console.error('Error handling message:', error);
-        sendResponse({ error: error.message });
+        sendResponse({ error: error.message, success: false });
+        return true;
     }
 });
 
-// **保持原有的音量变化处理逻辑**
+// **Keep original volume change handling logic**
 function handleVolumeChange(event) {
     const site = window.location.hostname;
     const el = event.target;
@@ -440,7 +517,7 @@ function handleVolumeChange(event) {
     });
 }
 
-// 页面卸载时清理
+// Clean up when page is unloaded
 window.addEventListener('beforeunload', () => {
     if (mediaObserver) {
         mediaObserver.disconnect();
@@ -450,7 +527,7 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// **保持向后兼容的函数**
+// **Keep backward compatible function**
 function checkForAudio() {
     return new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'checkForAudio' }, (response) => {
