@@ -8,16 +8,19 @@ let lastKnownVolume = 1.0;
 let hasNotifiedPopup = false; // Prevent duplicate notifications
 let isInitialized = false; // **New: Initialization status flag**
 
+// **新增：防抖相关变量**
+let checkMediaTimeout = null;
+let isCheckingMedia = false;
+let lastCheckTime = 0;
+const MIN_CHECK_INTERVAL = 1000; // 最小检查间隔1秒
+
 // **Optimized initialization process**
 initialize();
 
 function initialize() {
     if (isInitialized) {
-        console.log('Content script already initialized, skipping...');
         return;
     }
-    
-    console.log('Content script initializing...');
     
     try {
         // Wait for DOM to fully load
@@ -39,8 +42,6 @@ function initialize() {
 // **New: Function to finish initialization**
 function finishInitialization() {
     try {
-        console.log('Finishing content script initialization...');
-        
         // Setup linkage functionality
         linkage();
         
@@ -48,7 +49,6 @@ function finishInitialization() {
         setTimeout(() => {
             setupMediaDetection();
             isInitialized = true;
-            console.log('✓ Content script fully initialized and ready');
         }, 500);
         
     } catch (error) {
@@ -60,7 +60,7 @@ function finishInitialization() {
 // Setup comprehensive media detection
 function setupMediaDetection() {
     // 1. Initial detection
-    checkMedia();
+    debouncedCheckMedia();
     
     // 2. Setup DOM change observer
     setupMutationObserver();
@@ -72,13 +72,43 @@ function setupMediaDetection() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     // 5. Listen for page focus/blur events
-    window.addEventListener('focus', checkMedia);
-    window.addEventListener('blur', checkMedia);
+    window.addEventListener('focus', debouncedCheckMedia);
+    window.addEventListener('blur', debouncedCheckMedia);
+}
+
+// **新增：防抖版本的checkMedia**
+function debouncedCheckMedia() {
+    const now = Date.now();
+    
+    // 如果距离上次检查时间太短，则延迟执行
+    if (now - lastCheckTime < MIN_CHECK_INTERVAL) {
+        if (checkMediaTimeout) {
+            clearTimeout(checkMediaTimeout);
+        }
+        
+        checkMediaTimeout = setTimeout(() => {
+            checkMedia();
+        }, MIN_CHECK_INTERVAL - (now - lastCheckTime));
+        return;
+    }
+    
+    // 如果正在检查中，则跳过
+    if (isCheckingMedia) {
+        return;
+    }
+    
+    checkMedia();
 }
 
 // Main media element detection function - keep original logic, but enhance detection capability
 function checkMedia() {
-    console.log('Starting comprehensive media detection...');
+    // 防止重复执行
+    if (isCheckingMedia) {
+        return;
+    }
+    
+    isCheckingMedia = true;
+    lastCheckTime = Date.now();
     
     try {
         // 1. Detect direct audio and video elements
@@ -103,12 +133,13 @@ function checkMedia() {
         // **Key: Notify popup according to original logic**
         notifyPopupOfMediaElements(allDetectedElements);
         
-        console.log(`Media detection completed. Found ${allDetectedElements.length} total elements, ${playingElements.size} playing`);
-        
     } catch (error) {
         console.error('Error in media detection:', error);
         // Even if error, notify popup that there are no playing elements
         notifyPopupOfMediaElements([]);
+    } finally {
+        // 重置检查状态
+        isCheckingMedia = false;
     }
 }
 
@@ -131,23 +162,38 @@ function notifyPopupOfMediaElements(elements) {
         }
         
         // **Send message to background according to original format, then forward to popup**
-        chrome.runtime.sendMessage({
-            hasPlayingElement: true,
-            volume: volume,
-            currentDomain: currentDomain
-        });
-        
-        hasNotifiedPopup = true;
-        console.log(`Notified popup: has playing elements on ${currentDomain}, volume: ${volume}`);
-        
-    } else {
-        // No playing elements
-        chrome.runtime.sendMessage({
-            hasPlayingElement: false
-        });
+        try {
+            chrome.runtime.sendMessage({
+                hasPlayingElement: true,
+                volume: volume,
+                currentDomain: currentDomain
+            }, (response) => {
+                                 if (chrome.runtime.lastError) {
+                     // 静默处理连接错误，避免控制台spam
+                     return;
+                 }
+            });
+                 } catch (error) {
+             // 静默处理错误
+         }
+         
+         hasNotifiedPopup = true;
+         
+     } else {
+         // No playing elements
+         try {
+             chrome.runtime.sendMessage({
+                 hasPlayingElement: false
+             }, (response) => {
+                 if (chrome.runtime.lastError) {
+                     return;
+                 }
+             });
+         } catch (error) {
+             // 静默处理错误
+         }
         
         hasNotifiedPopup = false;
-        console.log('Notified popup: no playing elements');
     }
 }
 
@@ -283,22 +329,32 @@ function setupElementEventListeners(element) {
     
     element.dataset.volumeControllerListeners = 'true';
     
-    const events = ['play', 'pause', 'ended', 'volumechange', 'loadstart', 'canplay'];
+    // **分离关键事件和普通事件，减少不必要的检查**
+    const criticalEvents = ['play', 'pause', 'ended']; // 关键播放状态事件
+    const normalEvents = ['volumechange', 'loadstart', 'canplay']; // 普通事件
     
-    events.forEach(eventType => {
-        element.addEventListener(eventType, (event) => {
-            console.log(`Media event: ${eventType}`, element);
-            
-            // Delay detection to ensure state update, re-notify popup
-            setTimeout(() => {
-                checkMedia();
-                
-                if (eventType === 'volumechange') {
-                    handleVolumeChange(event);
-                }
-            }, 100);
-        });
-    });
+         // 关键事件需要立即检查
+     criticalEvents.forEach(eventType => {
+         element.addEventListener(eventType, (event) => {
+             debouncedCheckMedia();
+         });
+     });
+     
+     // 普通事件使用更长的延迟
+     normalEvents.forEach(eventType => {
+         element.addEventListener(eventType, (event) => {
+             if (eventType === 'volumechange') {
+                 handleVolumeChange(event);
+                 // 音量变化时不需要重新检查媒体元素
+                 return;
+             }
+             
+             // 对于其他普通事件，使用防抖检查
+             setTimeout(() => {
+                 debouncedCheckMedia();
+             }, 500);
+         });
+     });
 }
 
 // Setup DOM change observer
@@ -325,8 +381,9 @@ function setupMutationObserver() {
         });
         
         if (shouldCheck) {
-            console.log('DOM mutation detected, re-checking media elements');
-            setTimeout(checkMedia, 500);
+            setTimeout(() => {
+                debouncedCheckMedia();
+            }, 800);
         }
     });
     
@@ -343,17 +400,18 @@ function startPeriodicCheck() {
         clearInterval(mediaDetectionInterval);
     }
     
-    // Check media status every 10 seconds (reduce frequency to reduce performance impact)
+    // Check media status every 15 seconds (increased from 10 seconds)
     mediaDetectionInterval = setInterval(() => {
-        checkMedia();
-    }, 10000);
+        debouncedCheckMedia();
+    }, 15000);
 }
 
 // Handle page visibility change
 function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
-        console.log('Page became visible, checking media');
-        setTimeout(checkMedia, 500);
+        setTimeout(() => {
+            debouncedCheckMedia();
+        }, 800);
     }
 }
 
@@ -382,7 +440,6 @@ function linkage() {
                     for (const element of mediaElements) {
                         element.volume = item.volume;
                     }
-                    console.log(`Applied saved volume ${item.volume} for ${currentDomain}`);
                 }
             } catch (error) {
                 console.error('Error in linkage function:', error);
@@ -394,11 +451,8 @@ function linkage() {
 // **Keep original message listening logic**
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     try {
-        console.log('Content script received message:', message.type);
-        
         // **New: ping message response, used to check content script status**
         if (message.type === 'ping') {
-            console.log('Content script responding to ping');
             sendResponse({status: 'alive', timestamp: Date.now()});
             return true;
         }
@@ -408,10 +462,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             let volume = message.volume;
             const mediaElements = document.querySelectorAll('video, audio');
 
-            console.log(`Content script received siteVolume message: volume=${volume}, elements found=${mediaElements.length}`);
-
             if (mediaElements.length === 0) {
-                console.warn('No media elements found, but still responding to popup');
                 sendResponse({success: false, error: 'No media elements found', elementsUpdated: 0});
                 return true;
             }
@@ -421,14 +472,12 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
                 try {
                     element.volume = volume;
                     successCount++;
-                    console.log(`Set volume ${volume} on element:`, element.tagName, element.src || element.currentSrc);
                 } catch (err) {
-                    console.warn('Failed to set volume on element:', err);
+                    // 静默处理错误
                 }
             }
             
             lastKnownVolume = volume;
-            console.log(`Applied volume ${volume} from popup list control to ${successCount}/${mediaElements.length} elements`);
             
             // **Send detailed response confirming message processed**
             sendResponse({
@@ -440,13 +489,13 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             return true; // Keep message channel open
             
         } else if (message.type === 'getAudioStatus') {
-            // Immediately detect and respond
-            checkMedia();
+            // 使用防抖检查
+            debouncedCheckMedia();
             setTimeout(() => {
                 const hasAudio = playingElements.size > 0 || 
                                 document.querySelectorAll('video, audio').length > 0;
                 sendResponse({ hasAudio: hasAudio });
-            }, 100);
+            }, 200);
             return true;
             
         } else if (message.type === 'setVolume') {
@@ -459,18 +508,16 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
                     element.volume = volume;
                     successCount++;
                 } catch (err) {
-                    console.warn('Failed to set volume on element:', err);
+                    // 静默处理错误
                 }
             }
             
             lastKnownVolume = volume;
-            console.log(`Volume set to ${volume} on ${successCount} elements`);
             sendResponse({success: successCount > 0, elementsUpdated: successCount});
             return true;
             
         } else if (message.type === 'forceRecheck') {
-            console.log('Content script performing forced media recheck');
-            checkMedia();
+            debouncedCheckMedia();
             // Give some time for detection to complete
             setTimeout(() => {
                 const mediaElements = document.querySelectorAll('video, audio');
@@ -479,7 +526,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
                     mediaElementsFound: mediaElements.length,
                     playingElements: playingElements.size
                 });
-            }, 200);
+            }, 300);
             return true;
         }
     } catch (error) {
@@ -508,8 +555,6 @@ function handleVolumeChange(event) {
                 chrome.storage.local.set({
                     "mediaList": mediaList
                 });
-                
-                console.log(`Volume changed to ${newVolume} for ${site}`);
             }
         } catch (error) {
             console.error('Error handling volume change:', error);
@@ -525,6 +570,9 @@ window.addEventListener('beforeunload', () => {
     if (mediaDetectionInterval) {
         clearInterval(mediaDetectionInterval);
     }
+    if (checkMediaTimeout) {
+        clearTimeout(checkMediaTimeout);
+    }
 });
 
 // **Keep backward compatible function**
@@ -539,6 +587,4 @@ function checkForAudio() {
 function setVolume(volume) {
     chrome.runtime.sendMessage({ type: 'setVolume', volume: volume });
 }
-
-console.log('Enhanced content script loaded successfully - maintains original popup interaction logic');
 
