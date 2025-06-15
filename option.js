@@ -1,132 +1,601 @@
-window.onload = function(){
-    // 获取所有的菜单项元素 
-    let menus = document.querySelectorAll('#app   > div:nth-child(1) > ul > li'); 
-    // 遍历所有的菜单项元素，绑定一个click事件，调用select函数，传入当前元素 
-    for (let menu of menus) { 
-        menu.addEventListener('click', function () { 
-            select(this); 
-        }); 
-    } 
-    // 定义一个函数，用于切换菜单栏和内容框 
-    let mediaList = [];
-    const siteList = document.getElementById('siteList');
-    function select(element) {
-         // 获取当前点击的菜单项的data-id属性，即对应的内容框的id 
-         let id = element.dataset.id; 
-         // 获取所有的内容框元素 
-         let contents = document.querySelectorAll('#app  > div:nth-child(2) > div'); 
-         
-         // 遍历所有的内容框元素，如果id匹配，则显示，否则隐藏 
-         for (let content of contents) { 
-            if (content.id === id) { 
-                content.classList.remove('hidden'); 
-                
-                if(content.id === "option1"){
-                    document.getElementById('siteList').innerHTML = '';
-                    build();
-                }
-            } else { 
-                content.classList.add('hidden'); 
-            } 
-         } 
-    }
-    
-    function build(){
-        chrome.storage.local.get('mediaList', (result) => {
-            let resultMediaList =  [...new Set(result.mediaList)];
-            mediaList = resultMediaList;
-            for (let i=0; i<resultMediaList.length;i++) {
-                const listItem = document.createElement('li');
-                listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
-            
-                listItem.innerHTML = `
-                <div class="w-8 h-8 mr-4 flex-none  display flex align-items-center justify-content-center">
-                <img  src="${resultMediaList[i].logo}" class="object-fit cover object-position 50% 50%"></img>
-                </div>
-                <div class="ml-4 flex-grow">
-                    <strong class="block mb-1">${resultMediaList[i].url}</strong>
-                    <input class="w-full" type="range" min="0" max="1" step="0.1" value="${resultMediaList[i].volume}" data-site="${resultMediaList[i].url}"> 
-                </div>
-                <span id="volumevalue" class="text-right w-10 mt-4">${parseInt(resultMediaList[i].volume * 100)}%</span>
-                <span id="remove" class="w-5 h-5 ml-3 mt-4" data-site="${resultMediaList[i].url}" >
-                    
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 icon hover:text-red-500" data-site="${resultMediaList[i].url}">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                    </svg>  
-                </span>
-                `;
-            
-                siteList.appendChild(listItem);
-                const removeBtn = listItem.querySelector('span[id="remove"]')
-                
-                removeBtn.addEventListener('click',removeMedia)
+/**
+ * Volume Controller Options Page
+ * 优化版本 - 现代化代码结构和功能
+ */
 
-                // 监听滑动条变化
-                const rangeInput = listItem.querySelector('input[type="range"]');
-                rangeInput.addEventListener('input', handleRangeChange);
-            }
-        })
+class VolumeControllerOptions {
+    constructor() {
+        this.mediaList = [];
+        this.siteList = null;
+        this.siteCount = null;
+        this.emptyState = null;
+        this.mediaListContainer = null;
+        
+        this.init();
     }
 
-    function removeMedia(event){
-        const btn = event.target;
-  
-        // 获取data-site的值
-        const site = btn.dataset.site;
-        chrome.storage.local.get('mediaList', (result) => {
-                let mediaList = result.mediaList || [];
-                
-                // 找到索引
-                const index = mediaList.findIndex(item => item.url === site);
-                
-                // 从数组中删除
-                if(index > -1) {
-                mediaList.splice(index, 1); 
-                }
-                
-                // 设置回storage
-                chrome.storage.local.set({mediaList}, function() {
-                console.log('Deleted site');
-                renderList();
+    /**
+     * 初始化应用
+     */
+    init() {
+        // 获取DOM元素
+        this.siteList = document.getElementById('siteList');
+        this.siteCount = document.getElementById('siteCount');
+        this.emptyState = document.getElementById('emptyState');
+        this.mediaListContainer = document.getElementById('mediaListContainer');
+        
+        this.setupNavigation();
+        this.setupAdvancedSettings();
+        this.loadMediaList();
+        this.showDefaultPanel();
+    }
+
+    /**
+     * 设置导航菜单
+     */
+    setupNavigation() {
+        const menuItems = document.querySelectorAll('.sidebar-item');
+        
+        menuItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                this.handleMenuClick(e.currentTarget);
             });
-        })
-    }
-
-    // 重新渲染列表的函数
-    function renderList() {
-        // 清空列表
-        document.getElementById('siteList').innerHTML = '';
-        build();
-    }
-
-    function handleRangeChange(event) {
-
-        // 获取数据
-        const site = event.target.dataset.site;
-        const volume = parseFloat(event.target.value);
-      
-        // 更新示例数据
-        // 找到对应的列表项
-        const item = mediaList.find(item => item.url === site);
-        item.volume = volume;
-        // 获得更新项的索引
-        const index = mediaList.findIndex(item => item.url === site);
-        // 用新项替换旧项
-        mediaList.splice(index, 1, item);
-      
-        // 更新页面显示
-        const volumePercentage = volume * 100;
-        // 通过父元素查找 span
-        const rangeInput = event.target;
-        const inputParent = rangeInput.parentNode; 
-        // 输入框父元素的下一个兄弟元素
-        const textSpan = inputParent.nextElementSibling;
-        // 更新文本内容
-        textSpan.textContent = `${volumePercentage}%`;
-      
-        // 保存到本地存储
-        chrome.storage.local.set({
-          "mediaList": mediaList
         });
     }
+
+    /**
+     * 处理菜单点击
+     */
+    handleMenuClick(element) {
+        // 更新菜单样式
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        element.classList.add('active');
+
+        // 切换内容面板
+        const targetId = element.dataset.id;
+        this.showPanel(targetId);
+    }
+
+    /**
+     * 显示指定面板
+     */
+    showPanel(panelId) {
+        // 隐藏所有面板
+        document.querySelectorAll('.content-panel').forEach(panel => {
+            panel.classList.add('hidden');
+        });
+
+        // 显示目标面板
+        const targetPanel = document.getElementById(panelId);
+        if (targetPanel) {
+            targetPanel.classList.remove('hidden');
+            
+            // 如果是媒体列表面板，刷新数据
+            if (panelId === 'option1') {
+                this.refreshMediaList();
+            }
+        }
+    }
+
+    /**
+     * 显示默认面板
+     */
+    showDefaultPanel() {
+        this.showPanel('option1');
+    }
+
+    /**
+     * 加载媒体列表
+     */
+    async loadMediaList() {
+        try {
+            const result = await this.getStorageData('mediaList');
+            this.mediaList = [...new Set(result.mediaList || [])];
+            this.renderMediaList();
+            this.updateSiteCount();
+        } catch (error) {
+            console.error('Error loading media list:', error);
+            this.showError('加载媒体列表时出错');
+        }
+    }
+
+    /**
+     * 渲染媒体列表
+     */
+    renderMediaList() {
+        // 清空现有列表
+        if (this.siteList) {
+            this.siteList.innerHTML = '';
+        }
+
+        // 检查是否为空
+        if (this.mediaList.length === 0) {
+            this.showEmptyState();
+            return;
+        }
+
+        this.hideEmptyState();
+
+        // 渲染每个媒体项
+        this.mediaList.forEach((item, index) => {
+            const listItem = this.createMediaItem(item, index);
+            if (this.siteList) {
+                this.siteList.appendChild(listItem);
+            }
+        });
+    }
+
+    /**
+     * 创建媒体项DOM元素
+     */
+    createMediaItem(siteInfo, index) {
+        const listItem = document.createElement('li');
+        listItem.classList.add('media-item', 'flex', 'items-center', 'justify-between', 'p-4', 'rounded-lg', 'bg-gray-50');
+
+        // 使用base64图片或默认图标
+        const logoSrc = siteInfo.logo || this.getDefaultFavicon();
+        
+        listItem.innerHTML = `
+            <div class="flex items-center flex-grow">
+                <div class="w-10 h-10 mr-4 flex-shrink-0 rounded-lg overflow-hidden bg-white shadow-sm">
+                    <img src="${logoSrc}" 
+                         class="w-full h-full object-cover" 
+                         onerror="this.src='${this.getDefaultFavicon()}'"
+                         alt="Site logo">
+                </div>
+                <div class="flex-grow min-w-0">
+                    <h4 class="font-medium text-gray-800 truncate">${siteInfo.url}</h4>
+                    <div class="mt-2 flex items-center space-x-3">
+                        <div class="flex-grow relative">
+                            <div class="volume-slider-container">
+                                <div class="volume-progress" data-index="${index}" style="width: ${siteInfo.volume * 100}%"></div>
+                            </div>
+                            <input class="volume-slider absolute top-0 left-0 w-full" 
+                                   type="range" 
+                                   min="0" 
+                                   max="1" 
+                                   step="0.1" 
+                                   value="${siteInfo.volume}" 
+                                   data-site="${siteInfo.url}"
+                                   data-index="${index}"> 
+                        </div>
+                        <span class="volume-value text-sm font-medium text-blue-600 w-12 bg-blue-50 px-2 py-1 rounded">
+                            ${Math.round(siteInfo.volume * 100)}%
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <button class="delete-btn ml-4 p-2 rounded-lg hover:bg-red-50 transition-colors" 
+                    data-site="${siteInfo.url}" 
+                    data-index="${index}"
+                    title="删除此网站设置">
+                <svg class="w-5 h-5" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        `;
+
+        // 添加事件监听器
+        this.attachMediaItemListeners(listItem);
+
+        return listItem;
+    }
+
+    /**
+     * 为媒体项添加事件监听器
+     */
+    attachMediaItemListeners(listItem) {
+        // 音量滑动条事件
+        const rangeInput = listItem.querySelector('.volume-slider');
+        if (rangeInput) {
+            rangeInput.addEventListener('input', (e) => {
+                this.handleVolumeChange(e);
+            });
+        }
+
+        // 滑动条容器点击事件
+        const sliderContainer = listItem.querySelector('.volume-slider-container');
+        if (sliderContainer && rangeInput) {
+            sliderContainer.addEventListener('click', (e) => {
+                this.handleSliderClick(e, rangeInput);
+            });
+        }
+
+        // 删除按钮事件
+        const deleteBtn = listItem.querySelector('.delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                this.handleDeleteSite(e);
+            });
+        }
+    }
+
+    /**
+     * 处理滑动条点击
+     */
+    handleSliderClick(event, rangeInput) {
+        // 防止在拖拽时触发点击
+        if (event.target === rangeInput) {
+            return;
+        }
+        
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const width = rect.width;
+        const percentage = Math.max(0, Math.min(1, clickX / width));
+        
+        // 四舍五入到最近的0.1
+        const newVolume = Math.round(percentage * 10) / 10;
+        
+        // 更新滑动条值
+        rangeInput.value = newVolume;
+        
+        // 触发input事件来更新UI和保存数据
+        const inputEvent = new Event('input', { bubbles: true });
+        rangeInput.dispatchEvent(inputEvent);
+        
+        // 添加视觉反馈
+        event.currentTarget.style.transform = 'scale(0.98)';
+        setTimeout(() => {
+            event.currentTarget.style.transform = 'scale(1)';
+        }, 100);
+    }
+
+    /**
+     * 处理音量变化
+     */
+    handleVolumeChange(event) {
+        const site = event.target.dataset.site;
+        const index = parseInt(event.target.dataset.index);
+        const volume = parseFloat(event.target.value);
+
+        // 更新内存中的数据
+        if (this.mediaList[index]) {
+            this.mediaList[index].volume = volume;
+        }
+
+        // 更新进度条显示
+        const progressBar = event.target.parentNode.querySelector('.volume-progress');
+        if (progressBar) {
+            progressBar.style.width = `${volume * 100}%`;
+        }
+
+        // 更新百分比显示
+        const volumeSpan = event.target.parentNode.parentNode.querySelector('.volume-value');
+        if (volumeSpan) {
+            volumeSpan.textContent = `${Math.round(volume * 100)}%`;
+            
+            // 根据音量大小改变颜色
+            if (volume === 0) {
+                volumeSpan.className = 'volume-value text-sm font-medium text-gray-500 w-12 bg-gray-100 px-2 py-1 rounded';
+            } else if (volume < 0.3) {
+                volumeSpan.className = 'volume-value text-sm font-medium text-green-600 w-12 bg-green-50 px-2 py-1 rounded';
+            } else if (volume < 0.7) {
+                volumeSpan.className = 'volume-value text-sm font-medium text-blue-600 w-12 bg-blue-50 px-2 py-1 rounded';
+            } else {
+                volumeSpan.className = 'volume-value text-sm font-medium text-purple-600 w-12 bg-purple-50 px-2 py-1 rounded';
+            }
+        }
+
+        // 保存到存储
+        this.saveMediaList();
+    }
+
+    /**
+     * 处理删除网站
+     */
+    async handleDeleteSite(event) {
+        const site = event.target.dataset.site;
+        const index = parseInt(event.target.dataset.index);
+
+        // 确认对话框
+        if (!confirm(`确定要删除 ${site} 的音量设置吗？`)) {
+            return;
+        }
+
+        try {
+            // 从数组中删除
+            this.mediaList.splice(index, 1);
+            
+            // 保存并重新渲染
+            await this.saveMediaList();
+            this.renderMediaList();
+            this.updateSiteCount();
+            
+            this.showSuccess('网站设置已删除');
+        } catch (error) {
+            console.error('Error deleting site:', error);
+            this.showError('删除失败，请重试');
+        }
+    }
+
+    /**
+     * 刷新媒体列表
+     */
+    refreshMediaList() {
+        this.loadMediaList();
+    }
+
+    /**
+     * 更新网站计数
+     */
+    updateSiteCount() {
+        if (this.siteCount) {
+            this.siteCount.textContent = this.mediaList.length;
+        }
+    }
+
+    /**
+     * 显示空状态
+     */
+    showEmptyState() {
+        if (this.emptyState && this.mediaListContainer) {
+            this.emptyState.classList.remove('hidden');
+            this.mediaListContainer.classList.add('hidden');
+        }
+    }
+
+    /**
+     * 隐藏空状态
+     */
+    hideEmptyState() {
+        if (this.emptyState && this.mediaListContainer) {
+            this.emptyState.classList.add('hidden');
+            this.mediaListContainer.classList.remove('hidden');
+        }
+    }
+
+    /**
+     * 保存媒体列表到存储
+     */
+    async saveMediaList() {
+        try {
+            await this.setStorageData({ mediaList: this.mediaList });
+        } catch (error) {
+            console.error('Error saving media list:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 设置高级设置功能
+     */
+    setupAdvancedSettings() {
+        // 清除所有数据按钮
+        const clearAllBtn = document.getElementById('clearAllData');
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', () => {
+                this.handleClearAllData();
+            });
+        }
+
+        // 导出数据按钮
+        const exportBtn = document.getElementById('exportData');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+                this.handleExportData();
+            });
+        }
+
+        // 默认音量设置
+        const defaultVolumeSlider = document.getElementById('defaultVolume');
+        const defaultVolumeValue = document.getElementById('defaultVolumeValue');
+        
+        if (defaultVolumeSlider && defaultVolumeValue) {
+            defaultVolumeSlider.addEventListener('input', (e) => {
+                const volume = parseFloat(e.target.value);
+                defaultVolumeValue.textContent = `${Math.round(volume * 100)}%`;
+                
+                // 更新进度条
+                const progressBar = document.getElementById('defaultVolumeProgress');
+                if (progressBar) {
+                    progressBar.style.width = `${volume * 100}%`;
+                }
+                
+                // 根据音量大小改变颜色
+                if (volume === 0) {
+                    defaultVolumeValue.className = 'text-sm font-medium text-gray-500 w-12 bg-gray-100 px-2 py-1 rounded';
+                } else if (volume < 0.3) {
+                    defaultVolumeValue.className = 'text-sm font-medium text-green-600 w-12 bg-green-50 px-2 py-1 rounded';
+                } else if (volume < 0.7) {
+                    defaultVolumeValue.className = 'text-sm font-medium text-blue-600 w-12 bg-blue-50 px-2 py-1 rounded';
+                } else {
+                    defaultVolumeValue.className = 'text-sm font-medium text-purple-600 w-12 bg-purple-50 px-2 py-1 rounded';
+                }
+                
+                this.saveDefaultVolume(volume);
+            });
+
+            // 为默认音量滑动条容器添加点击事件
+            const defaultSliderContainer = defaultVolumeSlider.parentNode.querySelector('.volume-slider-container');
+            if (defaultSliderContainer) {
+                defaultSliderContainer.addEventListener('click', (e) => {
+                    this.handleSliderClick(e, defaultVolumeSlider);
+                });
+            }
+        }
+
+        // 加载默认音量设置
+        this.loadDefaultVolume();
+    }
+
+    /**
+     * 清除所有数据
+     */
+    async handleClearAllData() {
+        if (!confirm('确定要清除所有网站音量设置吗？此操作不可撤销！')) {
+            return;
+        }
+
+        try {
+            this.mediaList = [];
+            await this.saveMediaList();
+            this.renderMediaList();
+            this.updateSiteCount();
+            this.showSuccess('所有数据已清除');
+        } catch (error) {
+            console.error('Error clearing data:', error);
+            this.showError('清除数据失败');
+        }
+    }
+
+    /**
+     * 导出数据
+     */
+    handleExportData() {
+        try {
+            const dataToExport = {
+                mediaList: this.mediaList,
+                exportDate: new Date().toISOString(),
+                version: 'v0.0.6'
+            };
+
+            const dataStr = JSON.stringify(dataToExport, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `volume-controller-settings-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            
+            this.showSuccess('设置已导出');
+        } catch (error) {
+            console.error('Error exporting data:', error);
+            this.showError('导出失败');
+        }
+    }
+
+    /**
+     * 保存默认音量
+     */
+    async saveDefaultVolume(volume) {
+        try {
+            await this.setStorageData({ defaultVolume: volume });
+        } catch (error) {
+            console.error('Error saving default volume:', error);
+        }
+    }
+
+    /**
+     * 加载默认音量
+     */
+    async loadDefaultVolume() {
+        try {
+            const result = await this.getStorageData('defaultVolume');
+            const defaultVolume = result.defaultVolume || 1.0;
+            
+            const slider = document.getElementById('defaultVolume');
+            const valueSpan = document.getElementById('defaultVolumeValue');
+            const progressBar = document.getElementById('defaultVolumeProgress');
+            
+            if (slider) slider.value = defaultVolume;
+            if (valueSpan) {
+                valueSpan.textContent = `${Math.round(defaultVolume * 100)}%`;
+                
+                // 设置初始颜色
+                if (defaultVolume === 0) {
+                    valueSpan.className = 'text-sm font-medium text-gray-500 w-12 bg-gray-100 px-2 py-1 rounded';
+                } else if (defaultVolume < 0.3) {
+                    valueSpan.className = 'text-sm font-medium text-green-600 w-12 bg-green-50 px-2 py-1 rounded';
+                } else if (defaultVolume < 0.7) {
+                    valueSpan.className = 'text-sm font-medium text-blue-600 w-12 bg-blue-50 px-2 py-1 rounded';
+                } else {
+                    valueSpan.className = 'text-sm font-medium text-purple-600 w-12 bg-purple-50 px-2 py-1 rounded';
+                }
+            }
+            if (progressBar) {
+                progressBar.style.width = `${defaultVolume * 100}%`;
+            }
+        } catch (error) {
+            console.error('Error loading default volume:', error);
+        }
+    }
+
+    /**
+     * 获取默认图标
+     */
+    getDefaultFavicon() {
+        // 使用SVG图标的data URL
+        const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#6b7280">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm10.5 3c0-.77-.33-1.47-.85-1.96l1.42-1.42c.95.95 1.52 2.27 1.52 3.73 0 1.46-.57 2.78-1.52 3.73l-1.42-1.42c.52-.49.85-1.19.85-1.96z"/>
+        </svg>`;
+        
+        return `data:image/svg+xml;base64,${btoa(svgIcon)}`;
+    }
+
+    /**
+     * 获取存储数据 (Promise化)
+     */
+    getStorageData(key) {
+        return new Promise((resolve) => {
+            if (chrome && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.get(key, resolve);
+            } else {
+                resolve({});
+            }
+        });
+    }
+
+    /**
+     * 设置存储数据 (Promise化)
+     */
+    setStorageData(data) {
+        return new Promise((resolve) => {
+            if (chrome && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.set(data, resolve);
+            } else {
+                resolve();
+            }
+        });
+    }
+
+    /**
+     * 显示成功消息
+     */
+    showSuccess(message) {
+        this.showNotification(message, 'success');
+    }
+
+    /**
+     * 显示错误消息
+     */
+    showError(message) {
+        this.showNotification(message, 'error');
+    }
+
+    /**
+     * 显示通知
+     */
+    showNotification(message, type = 'info') {
+        // 创建通知元素
+        const notification = document.createElement('div');
+        notification.className = `notification fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50 transition-all duration-300 ${
+            type === 'success' ? 'bg-green-500 text-white' : 
+            type === 'error' ? 'bg-red-500 text-white' : 
+            'bg-blue-500 text-white'
+        }`;
+        notification.textContent = message;
+
+        // 添加到页面
+        document.body.appendChild(notification);
+
+        // 自动移除
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
 }
+
+// 页面加载完成后初始化
+window.onload = function() {
+    new VolumeControllerOptions();
+}; 

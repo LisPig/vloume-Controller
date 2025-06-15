@@ -70,6 +70,216 @@ function setupEventListeners() {
   }
 }
 
+// **新增：获取干净的logo**
+async function getCleanFavicon(domain, fallbackUrl) {
+  // 优先级策略：根域favicon -> Google服务 -> 原始favicon -> 默认图标
+  const faviconSources = [
+    `https://${domain}/favicon.ico`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+    `https://favicon.yandex.net/favicon/${domain}`,
+    fallbackUrl || `https://${domain}/favicon.ico`
+  ];
+  
+  for (const faviconUrl of faviconSources) {
+    try {
+      const base64Logo = await convertImageToBase64(faviconUrl);
+      if (base64Logo && base64Logo !== 'data:,') {
+        return base64Logo;
+      }
+    } catch (error) {
+      console.debug(`Failed to load favicon from ${faviconUrl}:`, error);
+      continue;
+    }
+  }
+  
+  // 如果所有方法都失败，返回默认图标
+  return getDefaultFavicon();
+}
+
+// **新增：将图片URL转换为base64**
+function convertImageToBase64(imageUrl) {
+  return new Promise((resolve, reject) => {
+    // 创建一个Image对象
+    const img = new Image();
+    img.crossOrigin = 'anonymous'; // 处理跨域问题
+    
+    img.onload = function() {
+      try {
+        // 创建canvas
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 设置canvas尺寸（统一为32x32以优化存储）
+        canvas.width = 32;
+        canvas.height = 32;
+        
+        // 绘制图片到canvas
+        ctx.drawImage(img, 0, 0, 32, 32);
+        
+        // 转换为base64
+        const base64 = canvas.toDataURL('image/png');
+        resolve(base64);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    img.onerror = function() {
+      reject(new Error('Failed to load image'));
+    };
+    
+    // 设置超时
+    setTimeout(() => {
+      reject(new Error('Image load timeout'));
+    }, 5000);
+    
+    img.src = imageUrl;
+  });
+}
+
+// **新增：获取默认图标**
+function getDefaultFavicon() {
+  // 创建一个简单的默认图标（32x32像素的灰色圆形）
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  
+  // 绘制默认图标
+  ctx.fillStyle = '#e5e7eb';
+  ctx.fillRect(0, 0, 32, 32);
+  ctx.fillStyle = '#6b7280';
+  ctx.beginPath();
+  ctx.arc(16, 16, 12, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // 添加简单的音符图标
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '16px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('♪', 16, 16);
+  
+  return canvas.toDataURL('image/png');
+}
+
+// **新增：从URL提取域名**
+function extractDomain(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, ''); // 移除www前缀
+  } catch (error) {
+    // 如果URL解析失败，尝试从字符串中提取
+    const match = url.match(/^https?:\/\/(?:www\.)?([^\/]+)/);
+    return match ? match[1] : url;
+  }
+}
+
+// **新增：获取干净的logo**
+async function getCleanFavicon(domain, fallbackUrl) {
+  // 优先级策略：根域favicon -> Google服务 -> 原始favicon -> 默认图标
+  const faviconSources = [
+    `https://${domain}/favicon.ico`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+    `https://favicon.yandex.net/favicon/${domain}`,
+    fallbackUrl || `https://${domain}/favicon.ico`
+  ];
+  
+  for (const faviconUrl of faviconSources) {
+    try {
+      const base64Logo = await convertImageToBase64(faviconUrl);
+      if (base64Logo && base64Logo !== 'data:,') {
+        return base64Logo;
+      }
+    } catch (error) {
+      console.debug(`Failed to load favicon from ${faviconUrl}:`, error);
+      continue;
+    }
+  }
+  
+  // 如果所有方法都失败，返回默认图标
+  return getDefaultFavicon();
+}
+
+// **新增：将图片URL转换为base64**
+function convertImageToBase64(imageUrl) {
+  return new Promise((resolve, reject) => {
+    // 创建一个Image对象
+    const img = new Image();
+    img.crossOrigin = 'anonymous'; // 处理跨域问题
+    
+    img.onload = function() {
+      try {
+        // 创建canvas
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 设置canvas尺寸（统一为32x32以优化存储）
+        canvas.width = 32;
+        canvas.height = 32;
+        
+        // 绘制图片到canvas
+        ctx.drawImage(img, 0, 0, 32, 32);
+        
+        // 转换为base64
+        const base64 = canvas.toDataURL('image/png');
+        resolve(base64);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    img.onerror = function() {
+      reject(new Error('Failed to load image'));
+    };
+    
+    // 设置超时
+    setTimeout(() => {
+      reject(new Error('Image load timeout'));
+    }, 5000);
+    
+    img.src = imageUrl;
+  });
+}
+
+// **新增：获取默认图标**
+function getDefaultFavicon() {
+  // 创建一个简单的默认图标（32x32像素的灰色圆形）
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  
+  // 绘制默认图标
+  ctx.fillStyle = '#e5e7eb';
+  ctx.fillRect(0, 0, 32, 32);
+  ctx.fillStyle = '#6b7280';
+  ctx.beginPath();
+  ctx.arc(16, 16, 12, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // 添加简单的音符图标
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '16px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('♪', 16, 16);
+  
+  return canvas.toDataURL('image/png');
+}
+
+// **新增：从URL提取域名**
+function extractDomain(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, ''); // 移除www前缀
+  } catch (error) {
+    // 如果URL解析失败，尝试从字符串中提取
+    const match = url.match(/^https?:\/\/(?:www\.)?([^\/]+)/);
+    return match ? match[1] : url;
+  }
+}
+
 function handleRangeChange(event) {
   const site = event.target.dataset.site;
   const volume = parseFloat(event.target.value);
@@ -239,38 +449,86 @@ function updateSiteVolume(site, volume) {
   }
 }
 
-function addSite() {
+// **修改：优化addSite函数，添加logo获取和转换**
+async function addSite() {
   let currentUrl = document.getElementById("siteNameInput").value;
-  const siteInfo = {
-    url: currentUrl,
-    logo: favicon,
-    volume: siteVolume,
-  };
+  const domain = extractDomain(currentUrl);
   
-  chrome.storage.local.get('mediaList', (result) => {
-    let resultMediaList = result.mediaList || [];
-    mediaList = Array.from(resultMediaList);
+  // 显示加载状态
+  const originalButtonText = addButton.textContent;
+  addButton.textContent = 'Adding...';
+  addButton.disabled = true;
+  
+  try {
+    // **获取干净的base64 logo**
+    const base64Logo = await getCleanFavicon(domain, favicon);
     
-    // 检查是否存在
-    const exists = mediaList.some(item => item.url === currentUrl);
-    // 如果已存在,不再添加
-    if (exists) {
-      return; 
-    }
-    mediaList.push(siteInfo);
-    chrome.storage.local.set({"mediaList" : mediaList});
-    // 调用刷新站点列表的函数
-    insertItem(siteInfo);
-  });
+    const siteInfo = {
+      url: currentUrl,
+      logo: base64Logo, // 使用base64格式的logo
+      volume: siteVolume,
+    };
+    
+    chrome.storage.local.get('mediaList', (result) => {
+      let resultMediaList = result.mediaList || [];
+      mediaList = Array.from(resultMediaList);
+      
+      // 检查是否存在
+      const exists = mediaList.some(item => item.url === currentUrl);
+      // 如果已存在,不再添加
+      if (exists) {
+        addButton.textContent = originalButtonText;
+        return; 
+      }
+      
+      mediaList.push(siteInfo);
+      chrome.storage.local.set({"mediaList" : mediaList});
+      // 调用刷新站点列表的函数
+      insertItem(siteInfo);
+      
+      // 恢复按钮状态
+      addButton.textContent = originalButtonText;
+    });
+    
+  } catch (error) {
+    console.error('Error adding site:', error);
+    // 发生错误时使用默认图标
+    const siteInfo = {
+      url: currentUrl,
+      logo: getDefaultFavicon(),
+      volume: siteVolume,
+    };
+    
+    chrome.storage.local.get('mediaList', (result) => {
+      let resultMediaList = result.mediaList || [];
+      mediaList = Array.from(resultMediaList);
+      
+      const exists = mediaList.some(item => item.url === currentUrl);
+      if (!exists) {
+        mediaList.push(siteInfo);
+        chrome.storage.local.set({"mediaList" : mediaList});
+        insertItem(siteInfo);
+      }
+      
+      addButton.textContent = originalButtonText;
+    });
+  }
 }
 
+// **修改：优化insertItem函数，直接使用base64图片**
 function insertItem(siteInfo) {
   const listItem = document.createElement('li');
   listItem.classList.add('flex', 'items-center', 'justify-between','my-4');
 
+  // **使用base64图片，添加错误处理**
+  const logoSrc = siteInfo.logo || getDefaultFavicon();
+  
   listItem.innerHTML = `
     <div class="w-8 h-8 flex-none display flex align-items-center justify-content-center">
-      <img src="${siteInfo.logo}" class="object-fit cover object-position 50% 50%">
+      <img src="${logoSrc}" 
+           class="w-full h-full object-cover rounded" 
+           onerror="this.src='${getDefaultFavicon()}'"
+           alt="Site logo">
     </div>
     <div class="ml-4 flex-grow">
       <strong class="block mb-1">${siteInfo.url}</strong>
